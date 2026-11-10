@@ -1,0 +1,39 @@
+services:
+  
+  exchange-service:
+    image: exchange-service:0.0.1-SNAPSHOT
+    #    container_name: exchange-service
+    build:
+      context: ./exchange-service
+      dockerfile: Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+    ports:
+      - "8000:8000"
+
+    networks:
+      - microservices-app
+
+  book-service:
+    image: book-service:0.0.1-SNAPSHOT
+#    container_name: book-service
+    build:
+      context: ./book-service
+      dockerfile: Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+    ports:
+      - "8100:8100"
+    networks:
+      - microservices-app
+
+networks:
+  microservices-app:
+    name: microservices-app
+    driver: bridge
+
+volumes:
+  exchange-db_data:
+  book-db_data:
