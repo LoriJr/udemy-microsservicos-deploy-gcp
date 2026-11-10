@@ -9,6 +9,7 @@ services:
     environment:
       TZ: America/Sao_Paulo
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/exchange_service
     ports:
       - "8000:8000"
 
@@ -24,6 +25,7 @@ services:
     environment:
       TZ: America/Sao_Paulo
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/book_service
     ports:
       - "8100:8100"
     networks:
