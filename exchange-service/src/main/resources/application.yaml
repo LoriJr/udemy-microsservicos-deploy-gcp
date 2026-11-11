@@ -24,7 +24,7 @@ spring:
     name: exchange-service
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://host.docker.internal:3306/exchange_service
+    url: jdbc:mysql://mysql:3306/exchange_service
     username: mysql
     password: 123456
   jpa:

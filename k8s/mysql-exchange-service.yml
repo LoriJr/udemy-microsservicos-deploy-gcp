@@ -1,0 +1,61 @@
+# MySQL do exchange-service DENTRO do GKE (banco de estudo — efêmero, semPV).
+# O usuário/senha abaixo batem com os valores já embutidos no application.yaml
+# do JAR (mysql/123456), então o app só precisa sobrescrever a URL:
+#   kubectl set env deployment exchange-service SPRING_DATASOURCE_URL=jdbc:mysql://exchange-mysql:3306/exchange_service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange-mysql
+  labels:
+    app: exchange-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exchange-mysql
+  strategy:
+    type: Recreate            # evita 2 pods MySQL escrevendo no mesmo storage durante update
+  template:
+    metadata:
+      labels:
+        app: exchange-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root-123456"
+            - name: MYSQL_DATABASE
+              value: "exchange_service"   # cria o schema no primeiro boot (Flyway só cria as tabelas)
+            - name: MYSQL_USER
+              value: "mysql"              # igual ao chumbado no JAR do exchange-service
+            - name: MYSQL_PASSWORD
+              value: "123456"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          resources:                # GKE Autopilot cobra pelas requests; limite evita OOM no boot do MySQL
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange-mysql        # DNS interno: exchange-mysql.<namespace>.svc.cluster.local
+spec:
+  type: ClusterIP
+  selector:
+    app: exchange-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306

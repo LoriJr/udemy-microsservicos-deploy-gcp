@@ -1,0 +1,61 @@
+# Ingress HTTP (Application Load Balancer) expondo as DUAS apps por UM unico IP externo.
+# Regras por prefixo de path, que ja batem com as rotas dos controllers:
+#   http://<IP>/exchange-service/...  -> Service exchange-service:8000
+#   http://<IP>/book-service/...      -> Service book-service:8100
+# BackendConfig: o LB do GKE faz health-check em "/" por padrao, e o Spring devolve 404
+# la -> backend ficaria UNHEALTHY. Apontamos o check para /actuator/health (habilitado nos 2 apps).
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: exchange-behc
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /actuator/health
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: book-behc
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /actuator/health
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: microservices-ingress
+  annotations:
+    # Annotation legado: processado pelo controlador GCE sem depender de objeto
+    # IngressClass (cluster novo nao vinha com a classe 'gce' nativa, e a classe
+    # criada a mao so funciona se a string do controller bater com a versao do GKE).
+    kubernetes.io/ingress.class: "gce"
+    # NB: app-protocols e backend-config NAO vao aqui -- sao annotations dos
+    # Services (ver kubernetes/exchange-service.yml e book-service.yml).
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /exchange-service
+            pathType: Prefix
+            backend:
+              service:
+                name: exchange-service
+                port:
+                  number: 8000
+          - path: /book-service
+            pathType: Prefix
+            backend:
+              service:
+                name: book-service
+                port:
+                  number: 8100

@@ -1,0 +1,69 @@
+# Deployment + Service da APLICAÇÃO exchange-service no GKE.
+# A imagem no Docker Hub foi buildada com a URL host.docker.internal no JAR,
+# mas as envs abaixo TEM PRECEDENCIA sobre o application.yaml (Spring relaxed binding).
+# Substitua SEU_USUARIO_DOCKERHUB pelo seu usuario do Docker Hub.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange-service
+  labels:
+    app: exchange-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exchange-service
+  template:
+    metadata:
+      labels:
+        app: exchange-service
+    spec:
+      containers:
+        - name: exchange-service
+          image: SEU_USUARIO_DOCKERHUB/exchange-service:latest
+          imagePullPolicy: Always        # sempre busca a :latest mais nova do hub
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://exchange-mysql:3306/exchange_service"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "mysql"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+          resources:                     # obrigatorio no Autopilot
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:                # so recebe trafego quando a porta 8000 abrir
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange-service       # DNS interno: exchange-service.default.svc.cluster.local
+  annotations:
+    # app-protocols e backend-config moram no SERVICE (e nao no Ingress!).
+    # O BackendConfig redireciona a sonda do LB para /actuator/health;
+    # sem isso o GKE sonda "/" e o Spring devolve 404 -> backend UNHEALTHY -> 502.
+    cloud.google.com/app-protocols: '{"http":"HTTP"}'
+    cloud.google.com/backend-config: '{"ports":{"8000":"exchange-behc"}}'
+spec:
+  type: ClusterIP
+  selector:
+    app: exchange-service
+  ports:
+    - name: http
+      port: 8000               # FEIGN: o @FeignClient concatena ":8000" ao valor da env,
+      targetPort: 8000         # entao o Service PRECISA escutar na porta 8000

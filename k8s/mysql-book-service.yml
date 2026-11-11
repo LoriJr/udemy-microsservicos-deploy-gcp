@@ -1,0 +1,61 @@
+# MySQL do book-service DENTRO do GKE (banco de estudo — efêmero, sem PV).
+# Usuário/senha batem com os valores embutidos no application.yaml do JAR
+# (mysql/123456), então o app só precisa sobrescrever a URL:
+#   kubectl set env deployment book-service SPRING_DATASOURCE_URL=jdbc:mysql://book-mysql:3306/book_service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-mysql
+  labels:
+    app: book-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: book-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root-123456"
+            - name: MYSQL_DATABASE
+              value: "book_service"       # cria o schema no primeiro boot
+            - name: MYSQL_USER
+              value: "mysql"              # igual ao chumbado no JAR do book-service
+            - name: MYSQL_PASSWORD
+              value: "123456"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          resources:                # GKE Autopilot cobra pelas requests; limite evita OOM no boot do MySQL
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-mysql            # DNS interno: book-mysql.<namespace>.svc.cluster.local
+spec:
+  type: ClusterIP
+  selector:
+    app: book-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
